@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI to Cigarette Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.0/axios.js" integrity="sha512-xWD36je/9YUjD4wYhpeuE/ZrfcMCtg4DKhu+dZKN3P7oEtC512t5n5wue9mTtcuygp5XZkj9Vd03dqbSPk+PcA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        .loader {
+        border: 16px solid #f3f3f3;
+        border-top: 16px solid #3498db;
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    </style>
+</head>
+<body class="bg-gray-100 p-5">
+    <div class="max-w-md mx-auto bg-white p-4 rounded-lg shadow-lg">
+        <h1 class="text-2xl mb-4 text-center">🌫 AQI to Cigarette Calculator 🚬</h1>
+        <p class="text-center mb-4 text-gray-700">Discover the equivalent number of cigarettes you'd smoke by breathing the air in your location.</p>
+
+<div id="loader" class="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-gray-800 bg-opacity-50 hidden">
+    <div class="loader"></div>
+</div>
+        <div class="mb-4 text-center">
+            <button onclick="useCurrentLocation()" class="bg-blue-500 text-white px-4 py-2 rounded-lg mr-2">Calculate for My Location</button>
+        </div>
+        <p class="text-center mb-2 text-gray-700">- OR -</p>
+        <p class="text-center mb-4 text-gray-700">Select a country, state, and city to calculate for a specific location:</p>
+        <div class="mb-4">
+            <select id="country-select" onchange="fetchStates()" class="w-full p-2 border rounded-lg">
+                <option value="">Select a country</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <select id="state-select" onchange="fetchCities()" disabled class="w-full p-2 border rounded-lg">
+                <option value="">Select a state</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <select id="city-select" disabled class="w-full p-2 border rounded-lg">
+                <option value="">Select a city</option>
+            </select>
+        </div>
+        <div class="mb-4 text-center">
+            <button onclick="fetchAQIwithCity()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">Calculate for City</button>
+        </div>
+        <div id="result" class="text-center hidden">
+            <p class="text-xl">Equivalent Cigarettes: <span id="cigarette-value"></span> 🚬</p>
+            <div id="cigarette-graphic"></div>
+        </div>
+        <p class="text-center mt-4 text-sm text-gray-500">*This calculation is based on the air quality index (AQI) and is for illustrative purposes only.</p>
+    </div>
+
+
+    <script type="text/javascript">
+
+
+var apiKey = 'f7630f61-32dc-450c-ba2a-c0c0c4b323bc'
+
+
+function showLoader() {
+        document.getElementById('loader').classList.remove('hidden');
+    }
+
+    function hideLoader() {
+        document.getElementById('loader').classList.add('hidden');
+    }
+
+       async function populateCountries() {
+  const response = await fetch(`http://api.airvisual.com/v2/countries?key=${apiKey}`);
+  const data = await response.json();
+  const countries = data.data;
+  const countrySelect = document.getElementById('country-select');
+  countries.forEach(country => {
+    const option = document.createElement('option');
+    option.value = country.country;
+    option.textContent = country.country;
+    countrySelect.appendChild(option);
+  });
+}
+
+async function fetchStates() {
+  const country = document.getElementById('country-select').value;
+  const response = await fetch(`http://api.airvisual.com/v2/states?country=${country}&key=${apiKey}`);
+  const data = await response.json();
+  const states = data.data;
+  const stateSelect = document.getElementById('state-select');
+  stateSelect.disabled = false;  // Enable state select
+      stateSelect.innerHTML = '';  // Clear previous options
+
+  states.forEach(state => {
+    const option = document.createElement('option');
+    option.value = state.state;
+    option.textContent = state.state;
+    stateSelect.appendChild(option);
+  });
+}
+
+async function fetchCities() {
+  const country = document.getElementById('country-select').value;
+  const state = document.getElementById('state-select').value;
+  const response = await fetch(`http://api.airvisual.com/v2/cities?state=${state}&country=${country}&key=${apiKey}`);
+  const data = await response.json();
+  const cities = data.data;
+  const citySelect = document.getElementById('city-select');
+    citySelect.innerHTML = '';  // Clear previous options
+
+  citySelect.disabled = false;  // Enable city select
+  cities.forEach(city => {
+    const option = document.createElement('option');
+    option.value = city.city;
+    option.textContent = city.city;
+    citySelect.appendChild(option);
+  });
+}
+
+// Call populateCountries when the page loads
+window.onload = populateCountries;
+
+
+async function fetchAQI(lat, lon) {
+    const response = await fetch(`http://api.airvisual.com/v2/nearest_city?lat=${lat}&lon=${lon}&key=f7630f61-32dc-450c-ba2a-c0c0c4b323bc`);
+    const data = await response.json();
+    hideLoader()
+    handleAQIResponse(data);
+}
+
+async function fetchAQIWithLocation(location) {
+    const { lat, lon } = await getLatLng(location);  // Assuming getLatLng is implemented
+    const response = await fetch(`http://api.airvisual.com/v2/nearest_city?lat=${lat}&lon=${lon}&key=f7630f61-32dc-450c-ba2a-c0c0c4b323bc`);
+    const data = await response.json();
+    handleAQIResponse(data);
+}
+
+
+
+        function handleAQIResponse(data) {
+            if (data && data.status === "success" && data.data.current.pollution) {
+                const aqi = data.data.current.pollution.aqius;
+                const cigarettes = calculateCigaretteEquivalent(aqi);
+                updateUI(aqi, cigarettes);
+            } else {
+                alert("Failed to fetch AQI data. Please try again.");
+            }
+        }
+
+
+        function calculateCigaretteEquivalent(aqi) {
+            const cigarettes = aqi / 22;
+            return cigarettes;
+        }
+
+        function updateUI(aqi, cigarettes) {
+            document.getElementById('result').classList.remove('hidden');
+            // document.getElementById('aqi-value').innerText = aqi;
+            document.getElementById('cigarette-value').innerText = cigarettes.toFixed(2);
+            // ... remaining code for updating the cigarette graphic ...
+        }
+
+        function useCurrentLocation() {
+    showLoader()
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    fetchAQI(lat, lon);
+                },
+                function(error) {
+                    console.error(error.message);
+                }
+            );
+        }
+
+        async function fetchAQIwithCity() {
+            showLoader()
+            const country = document.getElementById('country-select').value;
+            const state = document.getElementById('state-select').value;
+            const city = document.getElementById('city-select').value;
+            const response = await fetch(`http://api.airvisual.com/v2/city?city=${city}&state=${state}&country=${country}&key=${apiKey}`);
+            const data = await response.json();
+            if(data){hideLoader()}
+            handleAQIResponse(data);
+        }
+
+
+        function getAQI() {
+            const location = document.getElementById('location-input').value;
+            if (location) {
+                fetchAQIWithLocation(location);
+            } else {
+                alert("Please enter a location or use your current location.");
+            }
+        }
+
+        async function getLatLng(location) {
+            // Implement this function to convert a location name to latitude and longitude.
+        }
+    </script>
+</body>
+</html>
